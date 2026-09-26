@@ -1,19 +1,9 @@
 require("dotenv").config();
-const nodemailer = require("nodemailer");
-
-require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_APP_PASSWORD
-    }
-});
 
 function generateOTP() {
     return Math.floor(
@@ -1327,74 +1317,84 @@ app.post(
                                     // ==========================================
 
                                     try {
-                                        await transporter.sendMail({
-                                            from:
-                                                `"MarineGuard" <${process.env.EMAIL_USER}>`,
-                                                
-                                            to: email,
-                                            
-                                            subject:
-                                                "MarineGuard Email Verification OTP",
-                                                
-                                            html: `
-                                                <div style="
-                                                    font-family: Arial, sans-serif;
-                                                    max-width: 600px;
-                                                    margin: auto;
-                                                    padding: 25px;
-                                                    border: 1px solid #ddd;
-                                                    border-radius: 12px;
-                                                ">
-                                                
-                                                    <h2 style="color:#087f8c;">
-                                                        MarineGuard Email Verification
-                                                    </h2>
-
-                                                    <p>
-                                                        Hello <b>${name}</b>,
-                                                    </p>
-
-                                                    <p>
-                                                        Thank you for registering
-                                                        with MarineGuard.
-                                                    </p>
-
-                                                    <p>
-                                                        Your verification OTP is:
-                                                    </p>
-
+                                        const response = await fetch("https://api.resend.com/emails", {
+                                            method: "POST",
+                                            headers: {
+                                                "Content-Type": "application/json",
+                                                "Authorization": `Bearer ${process.env.RESEND_API_KEY}`
+                                            },
+                                            body: JSON.stringify({
+                                                from: "MarineGuard <onboarding@resend.dev>",
+                                                to: [email],
+                                                subject: "MarineGuard Email Verification OTP",
+                                                html: `
                                                     <div style="
-                                                        font-size: 32px;
-                                                        font-weight: bold;
-                                                        letter-spacing: 8px;
-                                                        text-align: center;
-                                                        padding: 15px;
-                                                        background: #eefbfc;
-                                                        border-radius: 10px;
-                                                        color: #087f8c;
+                                                        font-family: Arial, sans-serif;
+                                                        max-width: 600px;
+                                                        margin: auto;
+                                                        padding: 25px;
+                                                        border: 1px solid #ddd;
+                                                        border-radius: 12px;
                                                     ">
-                                                        ${otp}
+                                                    
+                                                        <h2 style="color:#087f8c;">
+                                                            MarineGuard Email Verification
+                                                        </h2>
+                                                        
+                                                        <p>
+                                                            Hello <b>${name}</b>,
+                                                        </p>
+                                                        
+                                                        <p>
+                                                            Thank you for registering
+                                                            with MarineGuard.
+                                                        </p>
+                                                        
+                                                        <p>
+                                                            Your verification OTP is:
+                                                        </p>
+                                                        
+                                                        <div style="
+                                                            font-size: 32px;
+                                                            font-weight: bold;
+                                                            letter-spacing: 8px;
+                                                            text-align: center;
+                                                            padding: 15px;
+                                                            background: #eefbfc;
+                                                            border-radius: 10px;
+                                                            color: #087f8c;
+                                                        ">
+                                                            ${otp}
+                                                        </div>
+                                                        
+                                                        <p>
+                                                            This OTP is valid for
+                                                            <b>5 minutes</b>.
+                                                        </p>
+                                                        
+                                                        <p>  
+                                                            If you did not request
+                                                            this registration, you
+                                                            can ignore this email.
+                                                        </p>
+                                                        
+                                                        <p>
+                                                            Regards,<br>
+                                                            <b>MarineGuard Team</b>
+                                                        </p>
+                                                        
                                                     </div>
-
-                                                    <p>
-                                                        This OTP is valid for
-                                                        <b>5 minutes</b>.
-                                                    </p>
-
-                                                    <p>
-                                                        If you did not request
-                                                        this registration, you
-                                                        can ignore this email.
-                                                    </p>
-
-                                                    <p>
-                                                        Regards,<br>
-                                                        <b>MarineGuard Team</b>
-                                                    </p>
-
-                                                </div>
-                                            `
+                                                `
+                                            })
                                         });
+                                        
+                                        const result = await response.json();
+                                        
+                                        if (!response.ok) {
+                                            throw new Error(
+                                                result.message || "Resend email sending failed"
+                                            );
+                                        }
 
                                         console.log(
                                             "✅ OTP sent to:",
