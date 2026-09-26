@@ -1214,10 +1214,10 @@ app.post(
                     }
 
                     // ==========================================
-                    // GENERATE OTP
+                    // GENERATE DEMO OTP
                     // ==========================================
 
-                    const otp = generateOTP();
+                    const otp = "123456";
 
                     // ==========================================
                     // HASH PASSWORD
@@ -1297,7 +1297,7 @@ app.post(
                                     otpHash,
                                     expiresAt
                                 ],
-                                async (insertError) => {
+                                (insertError) => {
 
                                     if (insertError) {
                                         console.error(
@@ -1313,141 +1313,23 @@ app.post(
                                     }
 
                                     // ==========================================
-                                    // SEND OTP EMAIL
+                                    // DEMO OTP
                                     // ==========================================
 
-                                    try {
-                                        const response = await fetch("https://api.resend.com/emails", {
-                                            method: "POST",
-                                            headers: {
-                                                "Content-Type": "application/json",
-                                                "Authorization": `Bearer ${process.env.RESEND_API_KEY}`
-                                            },
-                                            body: JSON.stringify({
-                                                from: "MarineGuard <noreply@marineguard.in>",
-                                                to: [email],
-                                                subject: "MarineGuard Email Verification OTP",
-                                                html: `
-                                                    <div style="
-                                                        font-family: Arial, sans-serif;
-                                                        max-width: 600px;
-                                                        margin: auto;
-                                                        padding: 25px;
-                                                        border: 1px solid #ddd;
-                                                        border-radius: 12px;
-                                                    ">
-                                                    
-                                                        <h2 style="color:#087f8c;">
-                                                            MarineGuard Email Verification
-                                                        </h2>
-                                                        
-                                                        <p>
-                                                            Hello <b>${name}</b>,
-                                                        </p>
-                                                        
-                                                        <p>
-                                                            Thank you for registering
-                                                            with MarineGuard.
-                                                        </p>
-                                                        
-                                                        <p>
-                                                            Your verification OTP is:
-                                                        </p>
-                                                        
-                                                        <div style="
-                                                            font-size: 32px;
-                                                            font-weight: bold;
-                                                            letter-spacing: 8px;
-                                                            text-align: center;
-                                                            padding: 15px;
-                                                            background: #eefbfc;
-                                                            border-radius: 10px;
-                                                            color: #087f8c;
-                                                        ">
-                                                            ${otp}
-                                                        </div>
-                                                        
-                                                        <p>
-                                                            This OTP is valid for
-                                                            <b>5 minutes</b>.
-                                                        </p>
-                                                        
-                                                        <p>  
-                                                            If you did not request
-                                                            this registration, you
-                                                            can ignore this email.
-                                                        </p>
-                                                        
-                                                        <p>
-                                                            Regards,<br>
-                                                            <b>MarineGuard Team</b>
-                                                        </p>
-                                                        
-                                                    </div>
-                                                `
-                                            })
-                                        });
-                                        
-                                        const result = await response.json();
-                                        
-                                        if (!response.ok) {
-                                            throw new Error(
-                                                result.message || "Resend email sending failed"
-                                            );
-                                        }
+                                    console.log(
+                                        "🔐 Demo OTP for",
+                                        email,
+                                        "is:",
+                                        otp
+                                    );
 
-                                        console.log(
-                                            "✅ OTP sent to:",
-                                            email
-                                        );
+                                    return res.json({
+                                        success: true,
+                                        verificationRequired: true,
+                                        message:
+                                            "OTP generated successfully. For this demo, use OTP: 123456."
+                                    });
 
-                                        return res.json({
-                                            success: true,
-                                            verificationRequired: true,
-                                            message:
-                                                "OTP sent successfully to your email."
-                                        });
-
-                                    } catch (emailError) {
-
-                                        console.error(
-                                            "OTP email sending error:",
-                                            emailError
-                                        );
-
-                                        // ==========================================
-                                        // INVALID / UNDELIVERABLE EMAIL
-                                        // ==========================================
-
-                                        const errorMessage =
-                                            (
-                                                emailError.message ||
-                                                ""
-                                            ).toLowerCase();
-
-                                        if (
-                                            emailError.code === "EENVELOPE" ||
-                                            errorMessage.includes("recipient") ||
-                                            errorMessage.includes("address") ||
-                                            errorMessage.includes("mailbox") ||
-                                            errorMessage.includes("user unknown") ||
-                                            errorMessage.includes("not found") ||
-                                            errorMessage.includes("does not exist")
-                                        ) {
-
-                                            return res.status(400).json({
-                                                success: false,
-                                                message:
-                                                    "Please enter a correct email address. This email address could not receive the OTP."
-                                            });
-                                        }
-
-                                        return res.status(500).json({
-                                            success: false,
-                                            message:
-                                                "Unable to send OTP email. Please try again."
-                                        });
-                                    }
                                 }
                             );
                         }
