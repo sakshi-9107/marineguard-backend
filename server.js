@@ -1,9 +1,17 @@
 require("dotenv").config();
+const nodemailer = require("nodemailer");
 
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 
+const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_APP_PASSWORD
+    }
+});
 
 function generateOTP() {
     return Math.floor(
@@ -16,11 +24,11 @@ const db = require("./db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = "marineguard_secret_key_2026";
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 
 // ==========================================
@@ -1214,10 +1222,10 @@ app.post(
                     }
 
                     // ==========================================
-                    // GENERATE DEMO OTP
+                    // GENERATE OTP
                     // ==========================================
 
-                    const otp = "123456";
+                    const otp = generateOTP();
 
                     // ==========================================
                     // HASH PASSWORD
@@ -1297,7 +1305,7 @@ app.post(
                                     otpHash,
                                     expiresAt
                                 ],
-                                (insertError) => {
+                                async (insertError) => {
 
                                     if (insertError) {
                                         console.error(
@@ -1313,23 +1321,131 @@ app.post(
                                     }
 
                                     // ==========================================
-                                    // DEMO OTP
+                                    // SEND OTP EMAIL
                                     // ==========================================
 
-                                    console.log(
-                                        "🔐 Demo OTP for",
-                                        email,
-                                        "is:",
-                                        otp
-                                    );
+                                    try {
+                                        await transporter.sendMail({
+                                            from:
+                                                `"MarineGuard" <${process.env.EMAIL_USER}>`,
+                                                
+                                            to: email,
+                                            
+                                            subject:
+                                                "MarineGuard Email Verification OTP",
+                                                
+                                            html: `
+                                                <div style="
+                                                    font-family: Arial, sans-serif;
+                                                    max-width: 600px;
+                                                    margin: auto;
+                                                    padding: 25px;
+                                                    border: 1px solid #ddd;
+                                                    border-radius: 12px;
+                                                ">
+                                                
+                                                    <h2 style="color:#087f8c;">
+                                                        MarineGuard Email Verification
+                                                    </h2>
 
-                                    return res.json({
-                                        success: true,
-                                        verificationRequired: true,
-                                        message:
-                                            "OTP generated successfully. For this demo, use OTP: 123456."
-                                    });
+                                                    <p>
+                                                        Hello <b>${name}</b>,
+                                                    </p>
 
+                                                    <p>
+                                                        Thank you for registering
+                                                        with MarineGuard.
+                                                    </p>
+
+                                                    <p>
+                                                        Your verification OTP is:
+                                                    </p>
+
+                                                    <div style="
+                                                        font-size: 32px;
+                                                        font-weight: bold;
+                                                        letter-spacing: 8px;
+                                                        text-align: center;
+                                                        padding: 15px;
+                                                        background: #eefbfc;
+                                                        border-radius: 10px;
+                                                        color: #087f8c;
+                                                    ">
+                                                        ${otp}
+                                                    </div>
+
+                                                    <p>
+                                                        This OTP is valid for
+                                                        <b>5 minutes</b>.
+                                                    </p>
+
+                                                    <p>
+                                                        If you did not request
+                                                        this registration, you
+                                                        can ignore this email.
+                                                    </p>
+
+                                                    <p>
+                                                        Regards,<br>
+                                                        <b>MarineGuard Team</b>
+                                                    </p>
+
+                                                </div>
+                                            `
+                                        });
+
+                                        console.log(
+                                            "✅ OTP sent to:",
+                                            email
+                                        );
+
+                                        return res.json({
+                                            success: true,
+                                            verificationRequired: true,
+                                            message:
+                                                "OTP sent successfully to your email."
+                                        });
+
+                                    } catch (emailError) {
+
+                                        console.error(
+                                            "OTP email sending error:",
+                                            emailError
+                                        );
+
+                                        // ==========================================
+                                        // INVALID / UNDELIVERABLE EMAIL
+                                        // ==========================================
+
+                                        const errorMessage =
+                                            (
+                                                emailError.message ||
+                                                ""
+                                            ).toLowerCase();
+
+                                        if (
+                                            emailError.code === "EENVELOPE" ||
+                                            errorMessage.includes("recipient") ||
+                                            errorMessage.includes("address") ||
+                                            errorMessage.includes("mailbox") ||
+                                            errorMessage.includes("user unknown") ||
+                                            errorMessage.includes("not found") ||
+                                            errorMessage.includes("does not exist")
+                                        ) {
+
+                                            return res.status(400).json({
+                                                success: false,
+                                                message:
+                                                    "Please enter a correct email address. This email address could not receive the OTP."
+                                            });
+                                        }
+
+                                        return res.status(500).json({
+                                            success: false,
+                                            message:
+                                                "Unable to send OTP email. Please try again."
+                                        });
+                                    }
                                 }
                             );
                         }
@@ -1755,12 +1871,10 @@ app.listen(
 
     PORT,
 
-    "0.0.0.0",
-
     () => {
 
         console.log(
-            `🌊 MarineGuard backend running on port ${PORT}`
+            `🌊 MarineGuard backend running on http://localhost:${PORT}`
         );
 
     }
