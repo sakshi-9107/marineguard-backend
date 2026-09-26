@@ -1324,7 +1324,7 @@ app.post(
                                                 "Authorization": `Bearer ${process.env.RESEND_API_KEY}`
                                             },
                                             body: JSON.stringify({
-                                                from: "MarineGuard <onboarding@resend.dev>",
+                                                from: "MarineGuard <noreply@marineguard.in>",
                                                 to: [email],
                                                 subject: "MarineGuard Email Verification OTP",
                                                 html: `
