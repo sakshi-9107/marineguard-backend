@@ -1878,7 +1878,7 @@ app.post("/api/users/reset-password", async (req, res) => {
         const [updateResult] =
             await db.promise().query(
                 `UPDATE users
-                 SET password_hash = ?
+                 SET password = ?
                  WHERE email = ?`,
                 [newPasswordHash, email]
             );
