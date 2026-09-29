@@ -1680,6 +1680,242 @@ app.post(
     }
 );
 
+
+// ==========================================
+// FORGOT PASSWORD - SEND OTP
+// ==========================================
+
+app.post("/api/users/forgot-password", async (req, res) => {
+
+    try {
+
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required."
+            });
+        }
+
+        // Check whether the email belongs to a registered user
+        const [users] = await db.promise().query(
+            "SELECT user_id, name, email FROM users WHERE email = ?",
+            [email]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No account found with this email address."
+            });
+        }
+
+        // Generate a new random 6-digit OTP
+        const otp = generateOTP();
+
+        // OTP is valid for 5 minutes
+        const expiresAt = new Date(
+            Date.now() + 5 * 60 * 1000
+        );
+
+        // Hash OTP before storing it
+        const otpHash = await bcrypt.hash(otp, 10);
+
+        // Remove any previous reset OTP
+        await db.promise().query(
+            "DELETE FROM password_resets WHERE email = ?",
+            [email]
+        );
+
+        // Store new reset OTP
+        await db.promise().query(
+            `INSERT INTO password_resets
+            (email, otp_hash, expires_at)
+            VALUES (?, ?, ?)`,
+            [email, otpHash, expiresAt]
+        );
+
+        // Send OTP through Gmail
+        await transporter.sendMail({
+
+            from: `"MarineGuard" <${process.env.EMAIL_USER}>`,
+
+            to: email,
+
+            subject: "MarineGuard Password Reset OTP",
+
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2>MarineGuard Password Reset</h2>
+
+                    <p>Hello ${users[0].name},</p>
+
+                    <p>
+                        Your password reset OTP is:
+                    </p>
+
+                    <h1 style="letter-spacing: 5px;">
+                        ${otp}
+                    </h1>
+
+                    <p>
+                        This OTP will expire in 5 minutes.
+                    </p>
+
+                    <p>
+                        If you did not request a password reset,
+                        you can ignore this email.
+                    </p>
+                </div>
+            `
+        });
+
+        return res.json({
+            success: true,
+            message: "Password reset OTP sent successfully."
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Forgot password error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to send password reset OTP."
+        });
+    }
+});
+
+
+// ==========================================
+// RESET PASSWORD
+// ==========================================
+
+app.post("/api/users/reset-password", async (req, res) => {
+
+    try {
+
+        const {
+            email,
+            otp,
+            newPassword
+        } = req.body;
+
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "Email, OTP and new password are required."
+            });
+        }
+
+        // Password validation
+        const passwordPattern =
+            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+
+        if (!passwordPattern.test(newPassword)) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Password must contain 8+ characters, uppercase, lowercase, number and special character."
+            });
+        }
+
+        // Find password reset request
+        const [resetRows] = await db.promise().query(
+            "SELECT * FROM password_resets WHERE email = ?",
+            [email]
+        );
+
+        if (resetRows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No password reset request found."
+            });
+        }
+
+        const resetData = resetRows[0];
+
+        // Check OTP expiry
+        if (
+            new Date(resetData.expires_at).getTime()
+            < Date.now()
+        ) {
+
+            await db.promise().query(
+                "DELETE FROM password_resets WHERE email = ?",
+                [email]
+            );
+
+            return res.status(400).json({
+                success: false,
+                message: "OTP has expired. Please request a new OTP."
+            });
+        }
+
+        // Compare entered OTP with stored hash
+        const otpMatch =
+            await bcrypt.compare(
+                otp,
+                resetData.otp_hash
+            );
+
+        if (!otpMatch) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid OTP."
+            });
+        }
+
+        // Hash the new password
+        const newPasswordHash =
+            await bcrypt.hash(newPassword, 10);
+
+        // Update user's password
+        const [updateResult] =
+            await db.promise().query(
+                `UPDATE users
+                 SET password_hash = ?
+                 WHERE email = ?`,
+                [newPasswordHash, email]
+            );
+
+        if (updateResult.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "User account not found."
+            });
+        }
+
+        // Delete used OTP
+        await db.promise().query(
+            "DELETE FROM password_resets WHERE email = ?",
+            [email]
+        );
+
+        return res.json({
+            success: true,
+            message: "Password changed successfully."
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Reset password error:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to reset password."
+        });
+    }
+});
+
+
 // ==========================================
 // USER LOGIN
 // ==========================================
